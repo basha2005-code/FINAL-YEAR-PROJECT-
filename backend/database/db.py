@@ -1,8 +1,7 @@
 import sqlite3
-import os
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, "academic.db")
 
 def get_connection():
-    return sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect("academic.db")
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn

@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from utils.csv_parser import parse_csv
-from models.performance import clear_performance_data
 from models.performance import (
     insert_performance_data,
     get_all_performance_data,
@@ -12,56 +12,67 @@ from models.performance import (
 
 upload_bp = Blueprint("upload_routes", __name__)
 
+
 @upload_bp.route("/api/upload/csv", methods=["POST"])
+@jwt_required()
 def upload_csv():
+    user_id = int(get_jwt_identity())
+    claims = get_jwt()
+    role = claims.get("role")
+
+    if role != "teacher":
+        return jsonify({"error": "Only teachers can upload"}), 403
+
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
 
+    semester = request.form.get("semester") or "1"
+
+    if not semester:
+        return jsonify({"error": "Semester required"}), 400
+
     file = request.files["file"]
+    rows = parse_csv(file)
 
-    if not file.filename.lower().endswith(".csv"):
-        return jsonify({"error": "Only CSV files allowed"}), 400
-
-    try:
-        rows = parse_csv(file)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-
-    if not rows:
-        return jsonify({"error": "CSV contains no valid rows"}), 400
-
-    clear_performance_data()
-    insert_performance_data(rows)
+    inserted = insert_performance_data(rows, semester, user_id)
 
     return jsonify({
-        "message": "Data uploaded successfully",
-        "rows_inserted": len(rows)
+        "message": "Upload successful",
+        "records_processed": inserted
     })
 
 
-
 @upload_bp.route("/api/performance", methods=["GET"])
+@jwt_required()
 def get_performance():
-    data = get_all_performance_data()
+    teacher_id = int(get_jwt_identity())
+    data = get_all_performance_data(teacher_id)
     return jsonify({"count": len(data), "data": data})
 
 
 @upload_bp.route("/api/analytics/average-marks", methods=["GET"])
+@jwt_required()
 def average_marks():
-    return jsonify({"average_marks": get_average_marks()})
+    teacher_id = int(get_jwt_identity())
+    return jsonify({"average_marks": get_average_marks(teacher_id)})
 
 
 @upload_bp.route("/api/analytics/average-attendance", methods=["GET"])
+@jwt_required()
 def average_attendance():
-    return jsonify({"average_attendance": get_average_attendance()})
+    teacher_id = int(get_jwt_identity())
+    return jsonify({"average_attendance": get_average_attendance(teacher_id)})
 
 
 @upload_bp.route("/api/analytics/pass-fail", methods=["GET"])
+@jwt_required()
 def pass_fail():
-    return jsonify(get_pass_fail_count())
+    teacher_id = int(get_jwt_identity())
+    return jsonify(get_pass_fail_count(teacher_id))
 
 
 @upload_bp.route("/api/analytics/at-risk", methods=["GET"])
+@jwt_required()
 def at_risk_students():
-    return jsonify(get_at_risk_students())
-
+    teacher_id = int(get_jwt_identity())
+    return jsonify(get_at_risk_students(teacher_id))

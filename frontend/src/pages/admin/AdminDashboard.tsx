@@ -1,190 +1,210 @@
 import { useEffect, useState } from "react";
-import { fetchAllPerformance } from "../../services/api";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import { Users, TrendingUp, AlertTriangle, BookOpen } from "lucide-react";
-
-interface PerformanceRow {
-  student_id: number;
-  subject: string;
-  marks: number;
-  attendance: number;
-  semester: string;
-}
+  fetchInstitutionPerformance,
+  createAcademicTerm,
+  fetchAcademicTerms,
+  registerStudentsBatch,
+  fetchRegisteredStudents,
+} from "../../services/api";
 
 export default function AdminDashboard() {
-  const [data, setData] = useState<PerformanceRow[]>([]);
+  const [performance, setPerformance] = useState<any[]>([]);
+  const [terms, setTerms] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [termName, setTermName] = useState("");
+  const [academicYear, setAcademicYear] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
-      const res = await fetchAllPerformance();
-      setData(res.data);
-      setLoading(false);
-    }
-    load();
+    loadPerformance();
+    loadAcademicTerms();
+    loadStudents();
   }, []);
 
-  if (loading) {
-    return <div className="p-8">Loading admin analytics...</div>;
+  async function loadPerformance() {
+    try {
+      const res = await fetchInstitutionPerformance();
+      setPerformance(res.data || []);
+    } catch {
+      setPerformance([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  // 🔥 Unique Students
-  const uniqueStudents = [...new Set(data.map((d) => d.student_id))];
+  async function loadAcademicTerms() {
+    try {
+      const res = await fetchAcademicTerms();
+      setTerms(res);
+    } catch {
+      setTerms([]);
+    }
+  }
 
-  // 🔥 Unique Subjects
-  const uniqueSubjects = [...new Set(data.map((d) => d.subject))];
+  async function loadStudents() {
+    try {
+      const res = await fetchRegisteredStudents();
+      setStudents(res);
+    } catch {
+      setStudents([]);
+    }
+  }
 
-  // 🔥 Overall Average Marks
-  const overallMarks =
-    data.reduce((sum, row) => sum + row.marks, 0) / data.length;
+  async function handleCreateTerm(e: React.FormEvent) {
+    e.preventDefault();
 
-  // 🔥 Overall Attendance
-  const overallAttendance =
-    data.reduce((sum, row) => sum + row.attendance, 0) / data.length;
+    try {
+      await createAcademicTerm(termName, academicYear);
+      setTermName("");
+      setAcademicYear("");
+      loadAcademicTerms();
+      alert("Academic term created successfully");
+    } catch (err: any) {
+      alert(err.message);
+    }
+  }
 
-  // 🔥 Students At Risk
-  const studentStats = uniqueStudents.map((id) => {
-    const studentRows = data.filter((d) => d.student_id === id);
-    const avgMarks =
-      studentRows.reduce((sum, r) => sum + r.marks, 0) /
-      studentRows.length;
-    const avgAttendance =
-      studentRows.reduce((sum, r) => sum + r.attendance, 0) /
-      studentRows.length;
+  async function handleStudentBatchUpload(e: React.FormEvent) {
+    e.preventDefault();
 
-    return {
-      student_id: id,
-      avgMarks,
-      avgAttendance,
-      atRisk: avgMarks < 60 || avgAttendance < 75,
-    };
-  });
+    if (!file) {
+      alert("Please select a CSV file");
+      return;
+    }
 
-  const atRiskCount = studentStats.filter((s) => s.atRisk).length;
-
-  const passRate =
-    ((studentStats.filter((s) => s.avgMarks >= 60).length /
-      studentStats.length) *
-      100).toFixed(1);
-
-  // 🔥 Subject-wise averages
-  const subjectStats = uniqueSubjects.map((subject) => {
-    const subjectRows = data.filter((d) => d.subject === subject);
-    return {
-      subject,
-      avgMarks:
-        subjectRows.reduce((sum, r) => sum + r.marks, 0) /
-        subjectRows.length,
-      avgAttendance:
-        subjectRows.reduce((sum, r) => sum + r.attendance, 0) /
-        subjectRows.length,
-    };
-  });
+    try {
+      const res = await registerStudentsBatch(file);
+      alert(`${res.students_created} students registered successfully`);
+      setFile(null);
+      loadStudents();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  }
 
   return (
     <div className="p-8 space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold mb-2">
-          Admin Dashboard
-        </h1>
-        <p className="text-gray-500">
-          Real-time institutional analytics overview
-        </p>
-      </div>
+      <h1 className="text-2xl font-semibold">Institution Administration</h1>
 
-      {/* 🔥 KPI SECTION */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
-        <KPI title="Total Students" value={uniqueStudents.length} icon={Users} />
-        <KPI title="Total Subjects" value={uniqueSubjects.length} icon={BookOpen} />
-        <KPI
-          title="Avg Marks"
-          value={`${overallMarks.toFixed(1)}%`}
-          icon={TrendingUp}
-        />
-        <KPI
-          title="Avg Attendance"
-          value={`${overallAttendance.toFixed(1)}%`}
-          icon={TrendingUp}
-        />
-        <KPI
-          title="Students At Risk"
-          value={atRiskCount}
-          icon={AlertTriangle}
-        />
-        <KPI title="Pass Rate" value={`${passRate}%`} icon={TrendingUp} />
-      </div>
-
-      {/* 🔥 SUBJECT CHART */}
+      {/* Academic Term Creation */}
       <div className="bg-white border rounded-lg p-6 shadow-sm">
-        <h3 className="mb-4 font-medium">
-          Subject-wise Performance Overview
-        </h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={subjectStats}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="subject" />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="avgMarks" fill="#000000" name="Avg Marks" />
-            <Bar dataKey="avgAttendance" fill="#666666" name="Avg Attendance" />
-          </BarChart>
-        </ResponsiveContainer>
+        <h3 className="mb-4 font-medium">Create Academic Term</h3>
+
+        <form onSubmit={handleCreateTerm} className="flex gap-4">
+          <input
+            type="text"
+            placeholder="Term Name"
+            value={termName}
+            onChange={(e) => setTermName(e.target.value)}
+            className="border p-2 rounded"
+            required
+          />
+
+          <input
+            type="text"
+            placeholder="Academic Year"
+            value={academicYear}
+            onChange={(e) => setAcademicYear(e.target.value)}
+            className="border p-2 rounded"
+            required
+          />
+
+          <button
+            type="submit"
+            className="bg-black text-white px-4 py-2 rounded"
+          >
+            Create
+          </button>
+        </form>
       </div>
 
-      {/* 🔥 RISK TABLE */}
+      {/* Academic Terms List */}
       <div className="bg-white border rounded-lg p-6 shadow-sm">
-        <h3 className="mb-4 font-medium">Student Risk Analysis</h3>
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-2 text-left">Student ID</th>
-              <th className="px-4 py-2 text-left">Avg Marks</th>
-              <th className="px-4 py-2 text-left">Avg Attendance</th>
-              <th className="px-4 py-2 text-left">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {studentStats.map((s) => (
-              <tr key={s.student_id} className="border-b">
-                <td className="px-4 py-2">{s.student_id}</td>
-                <td className="px-4 py-2">{s.avgMarks.toFixed(1)}%</td>
-                <td className="px-4 py-2">{s.avgAttendance.toFixed(1)}%</td>
-                <td className="px-4 py-2">
-                  {s.atRisk ? (
-                    <span className="text-red-600 font-medium">
-                      At Risk
-                    </span>
-                  ) : (
-                    <span className="text-green-600 font-medium">
-                      Good
-                    </span>
-                  )}
-                </td>
-              </tr>
+        <h3 className="mb-4 font-medium">Academic Terms</h3>
+
+        {terms.length === 0 ? (
+          <p className="text-gray-500">No academic terms available.</p>
+        ) : (
+          <ul className="space-y-2">
+            {terms.map((term) => (
+              <li key={term.id} className="border p-2 rounded">
+                {term.name} ({term.academic_year})
+              </li>
             ))}
-          </tbody>
-        </table>
+          </ul>
+        )}
       </div>
-    </div>
-  );
-}
 
-function KPI({ title, value, icon: Icon }: any) {
-  return (
-    <div className="bg-white border rounded-lg p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-sm text-gray-500">{title}</p>
-        <Icon className="w-4 h-4 text-gray-400" />
+      {/* Student Batch Registration */}
+      <div className="bg-white border rounded-lg p-6 shadow-sm">
+        <h3 className="mb-4 font-medium">Student Batch Registration</h3>
+
+        <form
+          onSubmit={handleStudentBatchUpload}
+          className="flex gap-4 items-center"
+        >
+          <input
+            type="file"
+            accept=".csv"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className="border p-2 rounded"
+            required
+          />
+
+          <button
+            type="submit"
+            className="bg-black text-white px-4 py-2 rounded"
+          >
+            Register Batch
+          </button>
+        </form>
       </div>
-      <h2 className="text-xl font-semibold">{value}</h2>
+
+      {/* Registered Students */}
+      <div className="bg-white border rounded-lg p-6 shadow-sm">
+        <h3 className="mb-4 font-medium">Registered Students</h3>
+
+        {students.length === 0 ? (
+          <p className="text-gray-500">No registered students.</p>
+        ) : (
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left">Roll No</th>
+                <th className="px-4 py-2 text-left">Name</th>
+                <th className="px-4 py-2 text-left">Department</th>
+                <th className="px-4 py-2 text-left">Section</th>
+                <th className="px-4 py-2 text-left">Batch</th>
+              </tr>
+            </thead>
+            <tbody>
+              {students.map((student) => (
+                <tr key={student.id} className="border-b">
+                  <td className="px-4 py-2">{student.roll_number}</td>
+                  <td className="px-4 py-2">{student.name}</td>
+                  <td className="px-4 py-2">{student.department}</td>
+                  <td className="px-4 py-2">{student.section}</td>
+                  <td className="px-4 py-2">{student.batch}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Performance Overview */}
+      <div className="bg-white border rounded-lg p-6 shadow-sm">
+        <h3 className="mb-4 font-medium">Performance Overview</h3>
+
+        {loading ? (
+          <p>Loading...</p>
+        ) : performance.length === 0 ? (
+          <p className="text-gray-500">No performance records available.</p>
+        ) : (
+          <p>{performance.length} performance records available.</p>
+        )}
+      </div>
     </div>
   );
 }

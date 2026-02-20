@@ -1,19 +1,19 @@
 from flask_bcrypt import Bcrypt
-from models.user import create_user_table, create_user
 from database.db import get_connection
 
 bcrypt = Bcrypt()
 
-create_user_table()
+conn = get_connection()
+cursor = conn.cursor()
 
-hashed = bcrypt.generate_password_hash("admin123").decode("utf-8")
+password_hash = bcrypt.generate_password_hash("admin123").decode("utf-8")
 
-create_user(
-    "Admin User",
-    "admin001",
-    "admin@email.com",
-    hashed,
-    "admin"
-)
+cursor.execute("""
+    INSERT INTO users (roll_number, password_hash, role)
+    VALUES (?, ?, ?)
+""", ("admin001", password_hash, "admin"))
 
-print("Admin user created.")
+conn.commit()
+conn.close()
+
+print("✅ Admin user created successfully")
