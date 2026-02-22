@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { fetchStudentInsight } from "../../services/api";
 import {
   LineChart,
   Line,
@@ -8,28 +7,24 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  RadialBarChart,
-  RadialBar,
-  Legend,
 } from "recharts";
+import { fetchStudentInsight } from "../../services/api";
 
 export default function StudentInsightsPage() {
   const [insight, setInsight] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-  const studentId = localStorage.getItem("student_id") || "1";
-
-  fetchStudentInsight(studentId)
-    .then((data) => {
-      setInsight(data);
-      setLoading(false);
-    })
-    .catch((err) => {
-      console.error(err);
-      setLoading(false);
-    });
-}, []);
+    fetchStudentInsight()
+      .then((data) => {
+        setInsight(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("ML Insight Error:", err);
+        setLoading(false);
+      });
+  }, []);
 
   if (loading) return <div className="p-8">Loading ML Insights...</div>;
 
@@ -43,113 +38,97 @@ export default function StudentInsightsPage() {
       </div>
     );
 
-  const predictedMarks = insight.predicted_next_marks;
-  const riskScore = insight.risk_score;
-  const passProbability = 100 - riskScore;
+  const predicted = Math.round(insight.predicted_next_marks || 0);
+  const risk = Math.round(insight.risk_score || 0);
+  const riskLevel = insight.risk_level || "Low";
 
-  const predictionData = [
-    {
-      name: "Current",
-      predicted: predictedMarks - 2,
-      actual: insight.features?.average_marks || 0,
-    },
-    { name: "Next Month", predicted: predictedMarks, actual: null },
-    { name: "Sem End", predicted: predictedMarks + 2, actual: null },
-  ];
+  const avgMarks = insight.features?.average_marks || 0;
+  const avgAttendance = insight.features?.average_attendance || 0;
 
-  const riskData = [
-    {
-      name: "Risk Score",
-      value: Math.round(riskScore),
-      fill:
-        riskScore < 30
-          ? "#10b981"
-          : riskScore < 60
-          ? "#f59e0b"
-          : "#ef4444",
-    },
+  const chartData = [
+    { name: "Current", value: avgMarks },
+    { name: "Predicted", value: predicted },
   ];
 
   return (
-    <div className="p-8">
-      <h1 className="mb-6">ML Prediction & Insights</h1>
+    <div className="p-8 space-y-8">
+      <h1 className="text-xl font-semibold">ML Prediction & Insights</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card
-          title="Predicted Next Semester Marks"
-          value={`${Math.round(predictedMarks)}%`}
-        />
-        <Card
-          title="Pass Probability"
-          value={`${Math.round(passProbability)}%`}
-        />
-        <Card
-          title="Your Risk Score"
-          value={`${Math.round(riskScore)}/100`}
-        />
+      {/* 🔹 CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card title="Predicted Marks" value={`${predicted}%`} />
+        <Card title="Risk Score" value={`${risk}/100`} />
+        <Card title="Risk Level" value={riskLevel} />
+        <Card title="Attendance" value={`${avgAttendance}%`} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <ChartCard title="Performance Prediction Trend">
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={predictionData}>
+      {/* 🔹 CHARTS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        {/* 📈 Trend */}
+        <div className="bg-white border p-6 rounded-lg shadow-sm">
+          <h3 className="mb-4">Performance Trend</h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
-              <YAxis domain={[0, 100]} />
+              <YAxis />
               <Tooltip />
-              <Line dataKey="actual" stroke="#000000" strokeWidth={2} />
-              <Line
-                dataKey="predicted"
-                stroke="#666666"
-                strokeWidth={2}
-                strokeDasharray="5 5"
-              />
+              <Line dataKey="value" stroke="#000" />
             </LineChart>
           </ResponsiveContainer>
-        </ChartCard>
+        </div>
 
-        <ChartCard title="Risk Score Visualization">
-          <ResponsiveContainer width="100%" height={300}>
-            <RadialBarChart
-              innerRadius="60%"
-              outerRadius="90%"
-              data={riskData}
-              startAngle={180}
-              endAngle={0}
+        {/* 🔥 Risk Level UI (FIXED CLEAN VERSION) */}
+        <div className="bg-white border p-6 rounded-lg shadow-sm flex flex-col items-center justify-center">
+          <h3 className="mb-4 w-full text-left">Risk Level</h3>
+
+          <div className="flex flex-col items-center justify-center h-[200px]">
+
+            <p
+              className={`text-3xl font-bold ${
+                risk >= 60
+                  ? "text-red-600"
+                  : risk >= 30
+                  ? "text-yellow-500"
+                  : "text-green-600"
+              }`}
             >
-              <RadialBar dataKey="value" />
-              <Legend />
-            </RadialBarChart>
-          </ResponsiveContainer>
-        </ChartCard>
+              {riskLevel}
+            </p>
+
+            <p className="text-sm text-gray-500 mt-2">
+              Based on marks & attendance
+            </p>
+          </div>
+        </div>
+
       </div>
 
-      <div className="bg-white border rounded-lg p-6 shadow-sm">
-        <h3 className="mb-4">Recommendations</h3>
-        <ul className="space-y-2 text-sm">
-          {insight.suggestions.map((s: string, i: number) => (
-            <li key={i}>• {s}</li>
-          ))}
-        </ul>
+      {/* 🔹 SUGGESTIONS */}
+      <div className="bg-gray-50 border p-6 rounded-lg">
+        <h3 className="mb-4">Suggestions</h3>
+
+        {insight.suggestions?.length ? (
+          insight.suggestions.map((s: string, i: number) => (
+            <p key={i} className="text-sm mb-2">
+              • {s}
+            </p>
+          ))
+        ) : (
+          <p>No suggestions available</p>
+        )}
       </div>
     </div>
   );
 }
 
+/* 🔹 CARD COMPONENT */
 function Card({ title, value }: any) {
   return (
-    <div className="bg-white border rounded-lg p-6 shadow-sm">
-      <p className="text-sm text-muted-foreground mb-1">{title}</p>
-      <h2>{value}</h2>
-    </div>
-  );
-}
-
-function ChartCard({ title, children }: any) {
-  return (
-    <div className="bg-white border rounded-lg p-6 shadow-sm">
-      <h3 className="mb-4">{title}</h3>
-      {children}
+    <div className="bg-white border p-4 rounded-lg shadow-sm">
+      <p className="text-sm text-gray-500">{title}</p>
+      <h2 className="text-lg font-semibold">{value}</h2>
     </div>
   );
 }

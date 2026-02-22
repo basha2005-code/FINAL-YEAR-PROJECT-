@@ -13,27 +13,29 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [secretKey, setSecretKey] = useState("");
   const [isRegister, setIsRegister] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    try {
-      if (isRegister) {
-        await registerTeacher(rollNumber, password, secretKey);
-        alert("Teacher Registered. Please Login.");
-        setIsRegister(false);
-        return;
-      }
-
-      const data = await authenticateUser(rollNumber, password);
-
-      localStorage.setItem("token", data.access_token);
-      localStorage.setItem("role", data.role);
-
-      onLogin(data.role);
-    } catch (err: any) {
-      alert(err.message);
+  try {
+    if (isRegister) {
+      await registerTeacher(rollNumber, password, secretKey);
+      alert("Teacher Registered. Please Login.");
+      setIsRegister(false);
+      return;
     }
-  };
+
+    const data = await authenticateUser(rollNumber, password);
+
+    console.log("LOGIN RESPONSE:", data); // 🔥 DEBUG
+
+    localStorage.setItem("token", data.access_token);
+    localStorage.setItem("role", data.role);
+
+    onLogin(data.role);
+  } catch (err: any) {
+    alert(err.message);
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center">

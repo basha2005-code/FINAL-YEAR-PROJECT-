@@ -1,9 +1,11 @@
 from flask import Blueprint, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
-
-from models.performance import (
-    calculate_risk,
-    predict_next_marks
+from models.performance import predict_next_marks
+from models.performance import get_subject_difficulty
+from services.ml_service import (
+    get_student_insight,
+    get_top_risk_students,
+    get_class_health
 )
 
 from database.db import get_connection
@@ -11,7 +13,6 @@ from database.db import get_connection
 ml_bp = Blueprint("ml", __name__, url_prefix="/api/ml")
 
 
-# 🔹 STUDENT INSIGHT (MAIN ML ENDPOINT)
 @ml_bp.route("/student-insight", methods=["GET"])
 @jwt_required()
 def student_insight():
@@ -25,11 +26,7 @@ def student_insight():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Get student id
-    cursor.execute("""
-        SELECT id, name FROM students
-        WHERE user_id = ?
-    """, (user_id,))
+    cursor.execute("SELECT id FROM students WHERE user_id = ?", (user_id,))
     student = cursor.fetchone()
 
     if not student:
@@ -38,34 +35,65 @@ def student_insight():
 
     student_id = student["id"]
 
-    # Get averages
     cursor.execute("""
-        SELECT AVG(marks) as avg_marks,
-               AVG(attendance) as avg_att
-        FROM performance
+        SELECT marks, attendance 
+        FROM performance 
         WHERE student_id = ?
     """, (student_id,))
-    stats = cursor.fetchone()
+    rows = cursor.fetchall()
 
-    avg_marks = round(stats["avg_marks"] or 0, 2)
-    avg_att = round(stats["avg_att"] or 0, 2)
+    if not rows:
+        conn.close()
+        return jsonify({"error": "No performance data"}), 404
 
-    # Risk score
-    risk_score = calculate_risk(avg_marks, avg_att)
+    avg_marks = sum(r["marks"] for r in rows) / len(rows)
+    avg_attendance = sum(r["attendance"] for r in rows) / len(rows)
 
-    # Prediction
-    predicted = predict_next_marks(student_id)
+    predicted_marks = predict_next_marks(student_id)
+
+    # 🔥 RISK SCORE
+    risk_score = 0
+    if avg_marks < 40:
+        risk_score += 50
+    elif avg_marks < 60:
+        risk_score += 25
+
+    if avg_attendance < 75:
+        risk_score += 30
+
+    risk_score = min(risk_score, 100)
+
+    # 🔥 RISK LEVEL (THIS FIXES YOUR ISSUE)
+    if risk_score >= 60:
+        risk_level = "High"
+    elif risk_score >= 30:
+        risk_level = "Medium"
+    else:
+        risk_level = "Low"
+
+    suggestions = []
+
+    if avg_marks < 60:
+        suggestions.append("Improve subject understanding and practice more.")
+
+    if avg_attendance < 75:
+        suggestions.append("Increase attendance for better performance.")
+
+    if avg_marks >= 70 and avg_attendance >= 80:
+        suggestions.append("Great work! Keep maintaining consistency.")
 
     conn.close()
 
     return jsonify({
-        "student_name": student["name"],
-        "average_marks": avg_marks,
-        "average_attendance": avg_att,
-        "risk_score": risk_score,
-        "predicted_next_semester_marks": predicted
+        "predicted_next_marks": float(predicted_marks),
+        "risk_score": float(risk_score),
+        "risk_level": risk_level,  # ✅ THIS FIXES FRONTEND
+        "features": {
+            "average_marks": float(round(avg_marks, 2)),
+            "average_attendance": float(round(avg_attendance, 2))
+        },
+        "suggestions": suggestions
     })
-
 
 # 🔹 TOP RISK STUDENTS (Teacher View)
 @ml_bp.route("/top-risk", methods=["GET"])
@@ -77,34 +105,9 @@ def top_risk_students():
     if role != "teacher":
         return jsonify({"error": "Unauthorized"}), 403
 
-    conn = get_connection()
-    cursor = conn.cursor()
+    teacher_id = int(get_jwt_identity())  # 🔥 ADD THIS
 
-    cursor.execute("""
-        SELECT s.name,
-               AVG(p.marks) as avg_marks,
-               AVG(p.attendance) as avg_att
-        FROM performance p
-        JOIN students s ON p.student_id = s.id
-        GROUP BY s.id
-    """)
-
-    rows = cursor.fetchall()
-    conn.close()
-
-    results = []
-
-    for r in rows:
-        avg_marks = r["avg_marks"] or 0
-        avg_att = r["avg_att"] or 0
-        risk = calculate_risk(avg_marks, avg_att)
-
-        results.append({
-            "name": r["name"],
-            "risk_score": risk
-        })
-
-    results.sort(key=lambda x: x["risk_score"], reverse=True)
+    results = get_top_risk_students(teacher_id)  # 🔥 PASS IT
 
     return jsonify(results)
 
@@ -119,16 +122,22 @@ def class_health():
     if role != "teacher":
         return jsonify({"error": "Unauthorized"}), 403
 
-    conn = get_connection()
-    cursor = conn.cursor()
+    teacher_id = int(get_jwt_identity())  # 🔥 ADD THIS
 
-    cursor.execute("SELECT AVG(marks) as avg_marks FROM performance")
-    result = cursor.fetchone()
-    conn.close()
+    result = get_class_health(teacher_id)  # 🔥 PASS IT
 
-    avg = round(result["avg_marks"] or 0, 2)
+    return jsonify(result)
+@ml_bp.route("/subject-difficulty", methods=["GET"])
+@jwt_required()
+def subject_difficulty():
+    claims = get_jwt()
+    role = claims.get("role")
 
-    return jsonify({
-        "class_average": avg,
-        "health_status": "Good" if avg >= 60 else "Needs Improvement"
-    })
+    if role != "teacher":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    teacher_id = int(get_jwt_identity())
+
+    data = get_subject_difficulty(teacher_id)
+
+    return jsonify(data)

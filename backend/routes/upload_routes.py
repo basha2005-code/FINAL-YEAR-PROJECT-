@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from flask_bcrypt import Bcrypt
 from utils.csv_parser import parse_csv
 from models.performance import (
     insert_performance_data,
@@ -9,8 +10,10 @@ from models.performance import (
     get_pass_fail_count,
     get_at_risk_students
 )
+from database.db import get_connection
 
 upload_bp = Blueprint("upload_routes", __name__)
+bcrypt = Bcrypt()
 
 
 @upload_bp.route("/api/upload/csv", methods=["POST"])
@@ -28,12 +31,10 @@ def upload_csv():
 
     semester = request.form.get("semester") or "1"
 
-    if not semester:
-        return jsonify({"error": "Semester required"}), 400
-
     file = request.files["file"]
     rows = parse_csv(file)
 
+    # 🔥 Insert performance normally
     inserted = insert_performance_data(rows, semester, user_id)
 
     return jsonify({

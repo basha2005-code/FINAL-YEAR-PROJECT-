@@ -1,11 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { KPICard } from "../../components/dashboard/KPICard";
-import {
-  TrendingUp,
-  Calendar,
-  Award,
-  AlertTriangle,
-} from "lucide-react";
+import { useEffect, useState } from "react";
+import { fetchStudentPerformance, fetchStudentInsight } from "../../services/api";
 import {
   LineChart,
   Line,
@@ -14,136 +8,132 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  BarChart,
+  Bar,
 } from "recharts";
-import { fetchAllPerformance } from "../../services/api";
-
-type Performance = {
-  student_id: string;
-  subject: string;
-  semester: string;
-  marks: number;
-  attendance: number;
-  recorded_at: string;
-};
 
 export default function StudentDashboard() {
-  const [data, setData] = useState<Performance[]>([]);
+  const [data, setData] = useState<any[]>([]);
+  const [insight, setInsight] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchAllPerformance()
-      .then((res) => setData(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetchStudentPerformance(),
+      fetchStudentInsight(),
+    ])
+      .then(([performance, insightData]) => {
+        setData(performance);
+        setInsight(insightData);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setLoading(false);
+      });
   }, []);
 
-  // 🔥 Pick first available student
-  const studentId = useMemo(() => {
-    if (!data.length) return null;
-    return data[0].student_id;
-  }, [data]);
+  if (loading) return <div className="p-8">Loading...</div>;
+  if (!data.length) return <div className="p-8">No data</div>;
 
-  const studentRecords = useMemo(() => {
-    if (!studentId) return [];
-    return data.filter((d) => d.student_id === studentId);
-  }, [data, studentId]);
+  const avgMarks =
+    data.reduce((sum, r) => sum + r.marks, 0) / data.length;
 
-  // Overall marks average
-  const overallMarks = useMemo(() => {
-    if (!studentRecords.length) return 0;
-    const total = studentRecords.reduce((sum, r) => sum + r.marks, 0);
-    return Math.round(total / studentRecords.length);
-  }, [studentRecords]);
+  const avgAttendance =
+    data.reduce((sum, r) => sum + r.attendance, 0) / data.length;
 
-  const overallAttendance = useMemo(() => {
-    if (!studentRecords.length) return 0;
-    const total = studentRecords.reduce((sum, r) => sum + r.attendance, 0);
-    return Math.round(total / studentRecords.length);
-  }, [studentRecords]);
+  const subjectData = data.map((d) => ({
+    subject: d.subject,
+    marks: d.marks,
+  }));
 
-  const grade =
-    overallMarks >= 75
-      ? "A"
-      : overallMarks >= 60
-      ? "B"
-      : overallMarks >= 50
-      ? "C"
-      : overallMarks >= 40
-      ? "D"
-      : "F";
+  const weakSubjects = data.filter((d) => d.marks < 60);
 
-  const isAtRisk = overallMarks < 40 || overallAttendance < 75;
-
-  if (loading) return <div className="p-8">Loading student data...</div>;
-  if (!studentId) return <div className="p-8">No student data available.</div>;
+  const riskColor =
+    insight?.risk_score < 30
+      ? "text-green-600"
+      : insight?.risk_score < 60
+      ? "text-yellow-500"
+      : "text-red-600";
 
   return (
-    <div className="p-8">
-      <h1 className="mb-6">Student Dashboard</h1>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <KPICard
-          title="Overall Marks"
-          value={`${overallMarks}%`}
-          icon={TrendingUp}
+    <div className="p-8 space-y-8">
+      
+      {/* 🔥 KPI CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card title="Avg Marks" value={`${avgMarks.toFixed(1)}%`} />
+        <Card title="Attendance" value={`${avgAttendance.toFixed(1)}%`} />
+        <Card
+          title="Risk Score"
+          value={`${insight?.risk_score || 0}/100`}
+          className={riskColor}
         />
-        <KPICard
-          title="Attendance"
-          value={`${overallAttendance}%`}
-          icon={Calendar}
-        />
-        <KPICard title="Grade" value={grade} icon={Award} />
-        <KPICard
-          title="Risk Status"
-          value={isAtRisk ? "At Risk" : "On Track"}
-          icon={AlertTriangle}
+        <Card
+          title="Predicted Marks"
+          value={`${Math.round(insight?.predicted_next_marks || 0)}%`}
         />
       </div>
 
-      {/* Marks Trend */}
-      <div className="bg-white border rounded-lg p-6 shadow-sm mb-8">
-        <h3 className="mb-4">Marks Trend</h3>
+      {/* 📈 PERFORMANCE TREND */}
+      <div className="bg-white border p-6 rounded-lg shadow-sm">
+        <h3 className="mb-4">Performance Trend</h3>
         <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={studentRecords}>
+          <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="semester" />
             <YAxis />
             <Tooltip />
-            <Line
-              type="monotone"
-              dataKey="marks"
-              stroke="#000000"
-              strokeWidth={2}
-            />
+            <Line dataKey="marks" stroke="#000" />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Subject Table */}
-      <div className="bg-white border rounded-lg p-6 shadow-sm">
+      {/* 📊 SUBJECT ANALYSIS */}
+      <div className="bg-white border p-6 rounded-lg shadow-sm">
         <h3 className="mb-4">Subject Performance</h3>
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="px-4 py-3 text-left">Subject</th>
-              <th className="px-4 py-3 text-left">Semester</th>
-              <th className="px-4 py-3 text-left">Marks</th>
-              <th className="px-4 py-3 text-left">Attendance</th>
-            </tr>
-          </thead>
-          <tbody>
-            {studentRecords.map((r, i) => (
-              <tr key={i} className="border-b">
-                <td className="px-4 py-2">{r.subject}</td>
-                <td className="px-4 py-2">{r.semester}</td>
-                <td className="px-4 py-2">{r.marks}</td>
-                <td className="px-4 py-2">{r.attendance}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={subjectData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="subject" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="marks" />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
+
+      {/* ⚠️ WEAK SUBJECTS */}
+      <div className="bg-white border p-6 rounded-lg shadow-sm">
+        <h3 className="mb-4">Weak Subjects</h3>
+
+        {weakSubjects.length === 0 ? (
+          <p className="text-green-600">All subjects are good 👍</p>
+        ) : (
+          weakSubjects.map((s, i) => (
+            <p key={i} className="text-red-500">
+              {s.subject} ({s.marks}%)
+            </p>
+          ))
+        )}
+      </div>
+
+      {/* 💡 ML SUGGESTIONS */}
+      <div className="bg-gray-50 border p-6 rounded-lg">
+        <h3 className="mb-4">AI Suggestions</h3>
+
+        {insight?.suggestions?.map((s: string, i: number) => (
+          <p key={i}>• {s}</p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Card({ title, value, className }: any) {
+  return (
+    <div className={`bg-white border p-4 rounded-lg shadow-sm ${className}`}>
+      <p className="text-sm text-gray-500">{title}</p>
+      <h2 className="text-xl font-semibold">{value}</h2>
     </div>
   );
 }

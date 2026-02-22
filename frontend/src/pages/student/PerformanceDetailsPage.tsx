@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchAllPerformance } from "../../services/api";
+import { fetchStudentPerformance } from "../../services/api";
 import {
   BarChart,
   Bar,
@@ -10,134 +10,124 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-interface PerformanceRow {
-  student_id: string;   // 🔥 string (matches backend)
-  subject: string;
-  marks: number;
-  attendance: number;
-  semester: string;
-}
-
 export default function PerformanceDetailsPage() {
-  const [data, setData] = useState<PerformanceRow[]>([]);
-  const studentId = "1"; // 🔥 must be string
+  const [data, setData] = useState<any[]>([]);
+  const [semesterFilter, setSemesterFilter] = useState("All");
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const res = await fetchAllPerformance();
-
-        const studentData = res.data.filter(
-          (row: PerformanceRow) =>
-            String(row.student_id) === studentId
-        );
-
-        setData(studentData);
-      } catch (err) {
-        console.error("Error loading performance:", err);
-      }
-    }
-
-    loadData();
+    fetchStudentPerformance()
+      .then((res) => setData(res))
+      .catch((err) => console.error(err));
   }, []);
 
-  if (!data.length) {
+  const filteredData =
+    semesterFilter === "All"
+      ? data
+      : data.filter((d) => d.semester === semesterFilter);
+
+  if (!filteredData.length)
     return <div className="p-8">Loading student performance...</div>;
-  }
 
   // 🔥 Calculations
-  const totalMarks = data.reduce((sum, row) => sum + row.marks, 0);
-  const overallPercentage = (totalMarks / data.length).toFixed(1);
+  const avgMarks =
+    filteredData.reduce((sum, r) => sum + r.marks, 0) /
+    filteredData.length;
 
-  const overallAttendance = (
-    data.reduce((sum, row) => sum + row.attendance, 0) / data.length
-  ).toFixed(1);
+  const avgAttendance =
+    filteredData.reduce((sum, r) => sum + r.attendance, 0) /
+    filteredData.length;
 
-  const subjectData = data.map((row) => ({
-    name: row.subject,
-    marks: row.marks,
-  }));
+  const bestSubject = filteredData.reduce((prev, curr) =>
+    curr.marks > prev.marks ? curr : prev
+  );
 
-  const calculateGrade = (percentage: number) => {
-    if (percentage >= 85) return "A";
-    if (percentage >= 70) return "B";
-    if (percentage >= 60) return "C";
-    return "D";
+  const weakSubjects = filteredData.filter((d) => d.marks < 60);
+
+  const getStatus = (marks: number) => {
+    if (marks >= 75) return "Good";
+    if (marks >= 60) return "Average";
+    return "Needs Improvement";
   };
 
-  const grade = calculateGrade(Number(overallPercentage));
-
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="mb-2">Performance Details</h1>
-        <p className="text-muted-foreground">
-          Detailed subject-wise performance breakdown
-        </p>
+    <div className="p-8 space-y-8">
+      
+      <h1 className="text-xl font-semibold">Performance Details</h1>
+
+      {/* 🔥 FILTER */}
+      <select
+        className="border p-2"
+        value={semesterFilter}
+        onChange={(e) => setSemesterFilter(e.target.value)}
+      >
+        <option>All</option>
+        {[...new Set(data.map((d) => d.semester))].map((s) => (
+          <option key={s}>{s}</option>
+        ))}
+      </select>
+
+      {/* 🔥 SUMMARY CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card title="Avg Marks" value={`${avgMarks.toFixed(1)}%`} />
+        <Card
+          title="Attendance"
+          value={`${avgAttendance.toFixed(1)}%`}
+        />
+        <Card title="Subjects" value={filteredData.length} />
+        <Card title="Best Subject" value={bestSubject.subject} />
       </div>
 
-      {/* Overall Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <p className="text-sm text-muted-foreground">Overall Average</p>
-          <h2>{overallPercentage}%</h2>
-        </div>
+      {/* 📊 CHART */}
+      <div className="bg-white border p-6 rounded-lg shadow-sm">
+        <h3 className="mb-4">Subject Performance</h3>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <p className="text-sm text-muted-foreground">Current Grade</p>
-          <h2>{grade}</h2>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <p className="text-sm text-muted-foreground">Subjects Enrolled</p>
-          <h2>{data.length}</h2>
-        </div>
-      </div>
-
-      {/* Chart */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-8">
-        <h3 className="mb-4">Subject-wise Marks Distribution</h3>
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={subjectData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="name" />
+          <BarChart data={filteredData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="subject" />
             <YAxis />
             <Tooltip />
-            <Bar dataKey="marks" fill="#000000" />
+            <Bar dataKey="marks" />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-8">
-        <h3 className="mb-4">Subject-wise Performance</h3>
+      {/* 📋 TABLE */}
+      <div className="bg-white border p-6 rounded-lg shadow-sm">
+        <h3 className="mb-4">Detailed Table</h3>
+
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-2 text-left">Subject</th>
-              <th className="px-4 py-2 text-left">Marks</th>
-              <th className="px-4 py-2 text-left">Attendance</th>
-              <th className="px-4 py-2 text-left">Status</th>
+              <th className="p-2">Subject</th>
+              <th className="p-2">Marks</th>
+              <th className="p-2">Attendance</th>
+              <th className="p-2">Status</th>
             </tr>
           </thead>
+
           <tbody>
-            {data.map((row) => {
-              const isLow = row.marks < 60 || row.attendance < 75;
+            {filteredData.map((row, i) => {
+              const status = getStatus(row.marks);
 
               return (
-                <tr key={row.subject} className="border-b">
-                  <td className="px-4 py-2">{row.subject}</td>
-                  <td className="px-4 py-2">{row.marks}</td>
-                  <td className="px-4 py-2">{row.attendance}%</td>
-                  <td className="px-4 py-2">
-                    {isLow ? (
-                      <span className="text-orange-600">
-                        Needs Improvement
-                      </span>
-                    ) : (
-                      <span className="text-green-600">Good</span>
-                    )}
+                <tr key={i} className="border-b text-center">
+                  <td className="p-2">{row.subject}</td>
+                  <td className="p-2">{row.marks}</td>
+                  <td className="p-2">{row.attendance}%</td>
+
+                  <td className="p-2">
+                    <span
+                      className={
+                        status === "Good"
+                          ? "text-green-600"
+                          : status === "Average"
+                          ? "text-yellow-500"
+                          : "text-red-600"
+                      }
+                    >
+                      {status}
+                    </span>
                   </td>
                 </tr>
               );
@@ -146,40 +136,31 @@ export default function PerformanceDetailsPage() {
         </table>
       </div>
 
-      {/* Dynamic Suggestions */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-        <h3 className="mb-4">Improvement Suggestions</h3>
+      {/* ⚠️ WEAK SUBJECT ALERT */}
+      <div className="bg-gray-50 border p-6 rounded-lg">
+        <h3 className="mb-4">Focus Areas</h3>
 
-        <div className="space-y-3">
-          {data
-            .filter(
-              (row) => row.marks < 60 || row.attendance < 75
-            )
-            .map((row) => (
-              <div key={row.subject} className="bg-white p-4 rounded border">
-                <strong>{row.subject}</strong>
-                <p className="text-sm text-muted-foreground">
-                  {row.marks < 60 &&
-                    "Improve your subject understanding and practice more problems. "}
-                  {row.attendance < 75 &&
-                    "Increase class attendance to improve performance."}
-                </p>
-              </div>
-            ))}
-
-          {/* If no issues */}
-          {data.every(
-            (row) => row.marks >= 60 && row.attendance >= 75
-          ) && (
-            <div className="bg-white p-4 rounded border">
-              <strong>Great Work!</strong>
-              <p className="text-sm text-muted-foreground">
-                You are performing well in all subjects. Keep it up!
-              </p>
-            </div>
-          )}
-        </div>
+        {weakSubjects.length === 0 ? (
+          <p className="text-green-600">
+            You are doing great in all subjects 👍
+          </p>
+        ) : (
+          weakSubjects.map((s, i) => (
+            <p key={i} className="text-red-500">
+              Improve {s.subject} (Marks: {s.marks})
+            </p>
+          ))
+        )}
       </div>
+    </div>
+  );
+}
+
+function Card({ title, value }: any) {
+  return (
+    <div className="bg-white border p-4 rounded-lg shadow-sm">
+      <p className="text-sm text-gray-500">{title}</p>
+      <h2 className="text-lg font-semibold">{value}</h2>
     </div>
   );
 }

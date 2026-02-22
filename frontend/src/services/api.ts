@@ -1,4 +1,4 @@
-const BASE_URL = "http://127.0.0.1:5000";
+const BASE_URL = "http://localhost:5000";
 
 /* ================= AUTH HEADER ================= */
 function getAuthHeaders() {
@@ -161,13 +161,20 @@ export async function uploadCSV(file: File, semester?: number) {
 /* ================= ML INSIGHTS ================= */
 
 export async function fetchStudentInsight() {
-  const res = await fetch(`${BASE_URL}/api/ml/student-insight`, {
-    headers: getAuthHeaders(),
+  const token = localStorage.getItem("token");
+
+  const res = await fetch(`http://localhost:5000/api/ml/student-insight`, {
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`, // 🔥 IMPORTANT
+    },
   });
 
-  if (!res.ok) throw new Error("Failed to fetch student insight");
+  const data = await res.json();
 
-  return res.json();
+  if (!res.ok) throw new Error(data.error || "Failed to fetch student insight");
+
+  return data;
 }
 
 export async function fetchSubjectDifficulty() {
@@ -215,4 +222,13 @@ export async function registerTeacher(
   if (!res.ok) throw new Error(data.error || "Registration failed");
 
   return data;
+}
+export async function fetchStudentPerformance() {
+  const res = await fetch(`${BASE_URL}/api/student/performance`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!res.ok) throw new Error("Failed to fetch student performance");
+
+  return res.json();
 }

@@ -25,7 +25,10 @@ def create_performance_table():
 
 
 def get_or_create_student(cursor, roll_number):
-    # Check if user exists
+    from flask_bcrypt import Bcrypt
+    from flask import current_app
+
+    # 🔹 Check if user exists
     cursor.execute(
         "SELECT id FROM users WHERE roll_number = ?",
         (roll_number,)
@@ -33,14 +36,22 @@ def get_or_create_student(cursor, roll_number):
     user = cursor.fetchone()
 
     if not user:
+        # 🔥 Hash password = roll_number
+        bcrypt = Bcrypt(current_app)
+        hashed_password = bcrypt.generate_password_hash(
+            roll_number
+        ).decode("utf-8")
+
         cursor.execute(
             "INSERT INTO users (roll_number, password_hash, role) VALUES (?, ?, 'student')",
-            (roll_number, "default123")
+            (roll_number, hashed_password)
         )
+
         user_id = cursor.lastrowid
     else:
         user_id = user["id"]
 
+    # 🔹 Check if student record exists
     cursor.execute(
         "SELECT id FROM students WHERE user_id = ?",
         (user_id,)
@@ -49,7 +60,11 @@ def get_or_create_student(cursor, roll_number):
 
     if not student:
         cursor.execute(
-            "INSERT INTO students (user_id, name, department, section, batch) VALUES (?, ?, ?, ?, ?)",
+            """
+            INSERT INTO students 
+            (user_id, name, department, section, batch) 
+            VALUES (?, ?, ?, ?, ?)
+            """,
             (user_id, roll_number, "BTECH", "A", "2024")
         )
         student_id = cursor.lastrowid
@@ -57,8 +72,6 @@ def get_or_create_student(cursor, roll_number):
         student_id = student["id"]
 
     return student_id
-
-
 def insert_performance_data(rows, semester, teacher_id):
     conn = get_connection()
     cursor = conn.cursor()
@@ -271,3 +284,37 @@ def predict_next_marks(student_id):
     avg_change = sum(improvements) / len(improvements)
 
     return round(rows[-1]["marks"] + avg_change, 2)
+
+def get_subject_difficulty(teacher_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT subject, AVG(marks) as avg_marks
+        FROM performance
+        WHERE teacher_id = ?
+        GROUP BY subject
+    """, (teacher_id,))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    results = []
+
+    for r in rows:
+        avg = round(r["avg_marks"], 2)
+
+        if avg < 50:
+            difficulty = "Hard"
+        elif avg < 70:
+            difficulty = "Medium"
+        else:
+            difficulty = "Easy"
+
+        results.append({
+            "subject": r["subject"],
+            "average_marks": avg,
+            "difficulty": difficulty
+        })
+
+    return results

@@ -5,16 +5,19 @@ from ml.forecasting import forecast_next_marks
 from ml.suggestions import generate_suggestions
 
 import pandas as pd
+import math
 
 
-def get_student_insight(student_id):
-    all_data = get_all_performance_data()
+# 🔹 STUDENT INSIGHT
+def get_student_insight(student_id, teacher_id):
+    all_data = get_all_performance_data(teacher_id)  # ✅ FIXED
     df = pd.DataFrame(all_data)
 
     if df.empty:
         return {"error": "No performance data available"}
 
-    student_df = df[df["student_id"] == str(student_id)]
+    # 🔥 FIX TYPE MATCH (important)
+    student_df = df[df["student_id"] == int(student_id)]
 
     if student_df.empty:
         return {"error": "Student not found"}
@@ -24,28 +27,31 @@ def get_student_insight(student_id):
     features = build_student_features(student_df)
 
     # 🔥 FIX NaN values
-    import math
     for key, value in features.items():
         if isinstance(value, float) and math.isnan(value):
             features[key] = 0
 
     risk_score, risk_level = calculate_risk_score(features)
-
     predicted_marks = forecast_next_marks(student_df)
-
     suggestions = generate_suggestions(features)
 
     return {
-        "student_id": student_id,
-        "risk_score": round(risk_score, 2),
-        "risk_level": risk_level,
-        "predicted_next_marks": round(predicted_marks, 2),
+        "student_id": int(student_id),  # 🔥 FIX
+        "risk_score": float(round(risk_score, 2)),  # 🔥 FIX
+        "risk_level": str(risk_level),  # 🔥 FIX
+        "predicted_next_marks": float(round(predicted_marks, 2)),  # 🔥 FIX
         "features": features,
         "suggestions": suggestions,
     }
-def get_top_risk_students():
-    all_data = get_all_performance_data()
+
+
+# 🔹 TOP RISK STUDENTS
+def get_top_risk_students(teacher_id):
+    all_data = get_all_performance_data(teacher_id)
     df = pd.DataFrame(all_data)
+
+    if df.empty:
+        return []
 
     results = []
 
@@ -53,12 +59,16 @@ def get_top_risk_students():
         student_df = df[df["student_id"] == student_id]
         student_df = student_df.sort_values(by="semester")
 
+        # 🔥 GET ROLL NUMBER
+        roll_number = str(student_df.iloc[0]["roll_number"])
+
         features = build_student_features(student_df)
         risk_score, risk_level = calculate_risk_score(features)
 
         results.append({
-            "student_id": student_id,
-            "risk_score": round(risk_score, 2),
+            "student_id": int(student_id),
+            "roll_number": roll_number,   # ✅ FIX
+            "risk_score": float(round(risk_score, 2)),
             "risk_level": risk_level
         })
 
@@ -66,33 +76,10 @@ def get_top_risk_students():
 
     return results[:10]
 
-def get_subject_difficulty():
-    all_data = get_all_performance_data()
-    df = pd.DataFrame(all_data)
 
-    subjects = []
-
-    for subject in df["subject"].unique():
-        sub_df = df[df["subject"] == subject]
-
-        avg_marks = sub_df["marks"].mean()
-        fail_rate = (sub_df["marks"] < 40).mean() * 100
-
-        difficulty_score = (100 - avg_marks) * 0.6 + fail_rate * 0.4
-
-        subjects.append({
-            "subject": subject,
-            "average_marks": round(avg_marks, 2),
-            "fail_rate": round(fail_rate, 2),
-            "difficulty_score": round(difficulty_score, 2)
-        })
-
-    subjects = sorted(subjects, key=lambda x: x["difficulty_score"], reverse=True)
-
-    return subjects
-
-def get_class_health():
-    all_data = get_all_performance_data()
+# 🔹 CLASS HEALTH
+def get_class_health(teacher_id):
+    all_data = get_all_performance_data(teacher_id)
     df = pd.DataFrame(all_data)
 
     if df.empty:
@@ -104,11 +91,10 @@ def get_class_health():
             "current_avg": 0
         }
 
-    avg_marks = df["marks"].mean()
-    avg_attendance = df["attendance"].mean()
-    pass_rate = (df["marks"] >= 40).mean() * 100
+    avg_marks = float(df["marks"].mean())  # 🔥 FIX
+    avg_attendance = float(df["attendance"].mean())  # 🔥 FIX
+    pass_rate = float((df["marks"] >= 40).mean() * 100)  # 🔥 FIX
 
-    # 🔮 Simple forecast logic (class-level trend)
     predicted_marks = min(avg_marks + 2, 100)
 
     health_score = (
@@ -125,9 +111,22 @@ def get_class_health():
         level = "Critical"
 
     return {
-        "health_score": round(health_score, 2),
-        "status": level,
-        "predicted_marks": round(predicted_marks, 2),
-        "pass_probability": round(pass_rate, 2),
-        "current_avg": round(avg_marks, 2)
+        "health_score": float(round(health_score, 2)),  # 🔥 FIX
+        "status": str(level),
+        "predicted_marks": float(round(predicted_marks, 2)),  # 🔥 FIX
+        "pass_probability": float(round(pass_rate, 2)),  # 🔥 FIX
+        "current_avg": float(round(avg_marks, 2))  # 🔥 FIX
     }
+def get_subject_difficulty(teacher_id):
+    from models.performance import get_subject_difficulty as db_func
+    
+    data = db_func(teacher_id)
+
+    return [
+        {
+            "subject": str(d["subject"]),
+            "average_marks": float(d["average_marks"]),
+            "difficulty": str(d["difficulty"])
+        }
+        for d in data
+    ]
