@@ -23,9 +23,10 @@ export default function Sidebar({
   onNavigate,
   onLogout,
 }: SidebarProps) {
+
   const teacherMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'upload', label: 'Upload Data', icon: Upload }, // ✅ NEW
+    { id: 'upload', label: 'Upload Data', icon: Upload }, // ✅ WORKING
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'at-risk', label: 'At-Risk Students', icon: AlertTriangle },
     { id: 'reports', label: 'Reports', icon: FileText },
@@ -51,19 +52,15 @@ export default function Sidebar({
       ? studentMenuItems
       : adminMenuItems;
 
-  // 🔑 Handle sidebar click
+  /* 🔥 FIXED NAVIGATION */
   const handleMenuClick = (id: string) => {
-    if (id === 'upload') {
-      // Trigger hidden CSV input in TeacherDashboard
-      document.getElementById('csv-upload')?.click();
-      return;
-    }
     onNavigate(id);
   };
 
   return (
     <div className="w-64 bg-black text-white h-screen flex flex-col">
-      {/* Header */}
+
+      {/* HEADER */}
       <div className="p-6 border-b border-gray-800">
         <div className="flex items-center gap-2">
           <div className="bg-white p-2 rounded">
@@ -76,7 +73,7 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Menu Items */}
+      {/* MENU */}
       <nav className="flex-1 p-4 overflow-y-auto">
         <ul className="space-y-1">
           {menuItems.map((item) => {
@@ -102,7 +99,7 @@ export default function Sidebar({
         </ul>
       </nav>
 
-      {/* User Section */}
+      {/* USER */}
       <div className="p-4 border-t border-gray-800">
         <div className="flex items-center gap-3 px-4 py-2 mb-2">
           <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">

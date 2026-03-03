@@ -13,6 +13,7 @@ import AnalyticsDashboard from "../pages/teacher/AnalyticsDashboard";
 import AtRiskStudentsPage from "../pages/teacher/AtRiskStudentsPage";
 import ReportsPage from "../pages/teacher/ReportsPage";
 import TeacherInsightsPage from "../pages/teacher/TeacherInsightsPage";
+import UploadPage from "../pages/teacher/UploadPage";
 
 // Student pages
 import StudentDashboard from "../pages/student/StudentDashboard";
@@ -26,9 +27,11 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(
     !!localStorage.getItem("token")
   );
+
   const [userRole, setUserRole] = useState<UserRole>(
     (localStorage.getItem("role") as UserRole) || "teacher"
   );
+
   const [currentPage, setCurrentPage] = useState("dashboard");
 
   const handleLogin = (role: UserRole) => {
@@ -44,6 +47,7 @@ export default function App() {
   };
 
   const handleNavigate = (page: string) => {
+    console.log("Navigating to:", page); // 🔥 DEBUG
     setCurrentPage(page);
   };
 
@@ -52,47 +56,61 @@ export default function App() {
   }
 
   const renderPage = () => {
-    // Teacher
+    /* ================= TEACHER ================= */
     if (userRole === "teacher") {
       switch (currentPage) {
         case "dashboard":
           return <TeacherDashboard />;
+
+        case "upload":
+          return <UploadPage />; // ✅ WORKING
+
         case "analytics":
           return <AnalyticsDashboard />;
+
         case "at-risk":
           return <AtRiskStudentsPage />;
+
         case "reports":
           return <ReportsPage />;
+
         case "insights":
           return <TeacherInsightsPage />;
+
         default:
           return <TeacherDashboard />;
       }
     }
 
-    // Student
+    /* ================= STUDENT ================= */
     if (userRole === "student") {
       switch (currentPage) {
         case "dashboard":
           return <StudentDashboard />;
+
         case "performance":
           return <PerformanceDetailsPage />;
+
         case "insights":
           return <StudentInsightsPage />;
+
         default:
           return <StudentDashboard />;
       }
     }
 
-    // Admin
+    /* ================= ADMIN ================= */
     if (userRole === "admin") {
       switch (currentPage) {
         case "dashboard":
           return <AdminDashboard />;
+
         case "analytics":
           return <AnalyticsDashboard />;
+
         case "reports":
           return <ReportsPage />;
+
         default:
           return <AdminDashboard />;
       }
@@ -109,7 +127,9 @@ export default function App() {
         onNavigate={handleNavigate}
         onLogout={handleLogout}
       />
-      <main className="flex-1 overflow-y-auto">{renderPage()}</main>
+      <main className="flex-1 overflow-y-auto">
+        {renderPage()}
+      </main>
     </div>
   );
 }

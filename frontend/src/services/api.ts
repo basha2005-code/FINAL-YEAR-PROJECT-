@@ -75,7 +75,6 @@ export async function registerStudentsBatch(
   return data;
 }
 
-
 export async function fetchRegisteredStudents() {
   const res = await fetch(`${BASE_URL}/api/admin/students`, {
     headers: getAuthHeaders(),
@@ -95,7 +94,7 @@ export async function fetchInstitutionPerformance() {
   return res.json();
 }
 
-/* ===== Restore Teacher Dashboard APIs ===== */
+/* ===== TEACHER DASHBOARD (ORIGINAL WORKING) ===== */
 
 export async function fetchAllPerformance() {
   return fetchInstitutionPerformance();
@@ -137,13 +136,14 @@ export async function fetchAtRiskStudents() {
   return res.json();
 }
 
+/* ================= CSV ================= */
 export async function uploadCSV(file: File, semester?: number) {
   const token = localStorage.getItem("token");
   const formData = new FormData();
   formData.append("file", file);
 
   if (semester) {
-    formData.append("semester", semester.toString()); // FIXED
+    formData.append("semester", semester.toString());
   }
 
   const res = await fetch(`${BASE_URL}/api/upload/csv`, {
@@ -158,15 +158,15 @@ export async function uploadCSV(file: File, semester?: number) {
   return data;
 }
 
-/* ================= ML INSIGHTS ================= */
+/* ================= ML (KEEP EXISTING) ================= */
 
 export async function fetchStudentInsight() {
   const token = localStorage.getItem("token");
 
-  const res = await fetch(`http://localhost:5000/api/ml/student-insight`, {
+  const res = await fetch(`${BASE_URL}/api/ml/student-insight`, {
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`, // 🔥 IMPORTANT
+      Authorization: `Bearer ${token}`,
     },
   });
 
@@ -207,6 +207,7 @@ export async function fetchClassHealth() {
   return res.json();
 }
 
+/* ================= TEACHER REGISTER ================= */
 export async function registerTeacher(
   roll_number: string,
   password: string,
@@ -223,6 +224,8 @@ export async function registerTeacher(
 
   return data;
 }
+
+/* ================= STUDENT ================= */
 export async function fetchStudentPerformance() {
   const res = await fetch(`${BASE_URL}/api/student/performance`, {
     headers: getAuthHeaders(),

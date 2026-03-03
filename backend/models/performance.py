@@ -318,3 +318,4 @@ def get_subject_difficulty(teacher_id):
         })
 
     return results
+

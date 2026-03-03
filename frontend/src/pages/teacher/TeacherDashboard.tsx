@@ -42,7 +42,7 @@ export default function TeacherDashboard() {
         setRiskStudents(risk);
         setSubjectDifficulty(subjects);
       } catch (err) {
-        console.error("Teacher Dashboard Error:", err);
+        console.error("Dashboard Error:", err);
       }
     }
 
@@ -58,27 +58,25 @@ export default function TeacherDashboard() {
 
   return (
     <div className="p-8">
-      <h1 className="text-xl font-semibold mb-6">
-        Teacher Dashboard
-      </h1>
+      <h1 className="text-xl font-semibold mb-6">Teacher Dashboard</h1>
 
-      {/* 🔹 CARDS */}
+      {/* CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card title="Average Marks" value={`${avgMarks}%`} color="green" />
-        <Card title="Attendance" value={`${avgAttendance}%`} color="blue" />
-        <Card title="At-Risk Students" value={riskStudents.length} color="red" />
-        <Card title="Pass Rate" value={`${passFail.pass}`} color="purple" />
+        <Card title="Average Marks" value={`${avgMarks}%`} />
+        <Card title="Attendance" value={`${avgAttendance}%`} />
+        <Card title="At-Risk Students" value={riskStudents.length} />
+        <Card title="Pass Count" value={passFail.pass} />
       </div>
 
-      {/* 🔹 CHARTS */}
+      {/* CHARTS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
 
         {/* PASS FAIL */}
         <div className="bg-white p-6 rounded border shadow-sm">
-          <h3 className="mb-4 font-medium">Pass vs Fail</h3>
+          <h3 className="mb-4">Pass vs Fail</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
-              <Pie data={passFailData} dataKey="value" outerRadius={100}>
+              <Pie data={passFailData} dataKey="value">
                 {passFailData.map((entry, index) => (
                   <Cell key={index} fill={COLORS[index]} />
                 ))}
@@ -90,7 +88,7 @@ export default function TeacherDashboard() {
 
         {/* RISK STUDENTS */}
         <div className="bg-white p-6 rounded border shadow-sm">
-          <h3 className="mb-4 font-medium">Top Risk Students</h3>
+          <h3 className="mb-4">Top Risk Students</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={riskStudents.slice(0, 5)}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -104,41 +102,41 @@ export default function TeacherDashboard() {
 
       </div>
 
-      {/* 🔹 SUBJECT DIFFICULTY (NEW 🔥) */}
+      {/* SUBJECT DIFFICULTY */}
       <div className="bg-white p-6 rounded border shadow-sm mb-8">
-        <h3 className="mb-4 font-medium">Subject Difficulty Analysis</h3>
+        <h3 className="mb-4">Subject Difficulty Analysis</h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={subjectDifficulty}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="subject" />
             <YAxis />
             <Tooltip />
-            <Bar dataKey="average_marks" fill="#000000" />
+            <Bar dataKey="average_marks" fill="#000" />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* 🔹 TABLE */}
+      {/* TABLE */}
       <div className="bg-white p-6 rounded border shadow-sm">
-        <h3 className="mb-4 font-medium">At-Risk Students</h3>
+        <h3 className="mb-4">At-Risk Students</h3>
 
         <table className="w-full">
-          <thead className="bg-gray-100">
+          <thead>
             <tr>
-              <th className="p-2 text-left">Roll</th>
-              <th className="p-2 text-left">Marks</th>
-              <th className="p-2 text-left">Attendance</th>
-              <th className="p-2 text-left">Risk</th>
+              <th>Roll</th>
+              <th>Marks</th>
+              <th>Attendance</th>
+              <th>Risk Score</th>
             </tr>
           </thead>
 
           <tbody>
             {riskStudents.map((s, i) => (
               <tr key={i} className="border-b">
-                <td className="p-2">{s.roll_number}</td>
-                <td className="p-2">{s.average_marks}</td>
-                <td className="p-2">{s.average_attendance}</td>
-                <td className="p-2 text-red-600 font-semibold">
+                <td>{s.roll_number}</td>
+                <td>{s.average_marks}</td>
+                <td>{s.average_attendance}</td>
+                <td className="text-red-600 font-semibold">
                   {s.risk_score}
                 </td>
               </tr>
@@ -150,21 +148,12 @@ export default function TeacherDashboard() {
   );
 }
 
-/* 🔹 CARD */
-function Card({ title, value, color }: any) {
-  const colors: any = {
-    green: "text-green-600",
-    blue: "text-blue-600",
-    red: "text-red-600",
-    purple: "text-purple-600",
-  };
-
+/* CARD */
+function Card({ title, value }: any) {
   return (
     <div className="bg-white border p-6 rounded shadow-sm">
       <p className="text-sm text-gray-500">{title}</p>
-      <h2 className={`text-xl font-semibold ${colors[color]}`}>
-        {value}
-      </h2>
+      <h2 className="text-xl font-semibold">{value}</h2>
     </div>
   );
 }
