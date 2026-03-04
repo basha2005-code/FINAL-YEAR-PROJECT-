@@ -1,13 +1,12 @@
-from database.db import get_connection
+import sqlite3
 
-conn = get_connection()
+conn = sqlite3.connect("academic.db")
 cursor = conn.cursor()
 
-cursor.execute("SELECT * FROM users")
-rows = cursor.fetchall()
+cursor.execute("PRAGMA table_info(performance)")
+print(cursor.fetchall())
 
-print("Users table:")
-for row in rows:
-    print(row)
-
+conn.commit()
 conn.close()
+
+print("Semester 2 inserted")

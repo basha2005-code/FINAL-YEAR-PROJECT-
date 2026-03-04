@@ -235,3 +235,21 @@ export async function fetchStudentPerformance() {
 
   return res.json();
 }
+
+export async function fetchSemesterTrend() {
+  const res = await fetch(`${BASE_URL}/api/ml/semester-trend`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!res.ok) throw new Error("Failed to fetch semester trend");
+  return res.json();
+}
+
+export async function fetchComparisonInsight() {
+  const res = await fetch(`${BASE_URL}/api/ml/comparison-insight`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!res.ok) throw new Error("Failed to fetch comparison insight");
+  return res.json();
+}

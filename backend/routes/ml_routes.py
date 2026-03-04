@@ -1,7 +1,11 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, app, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
-from models.performance import predict_next_marks
+from models.performance import get_semester_trend, predict_next_marks
 from models.performance import get_subject_difficulty
+from models.performance import calculate_class_health  # 🔥 ADD THIS IMPORT
+from models.performance import get_semester_trend
+from models.performance import generate_interventions
+from models.performance import generate_comparative_insight
 from services.ml_service import (
     get_student_insight,
     get_top_risk_students,
@@ -111,22 +115,6 @@ def top_risk_students():
 
     return jsonify(results)
 
-
-# 🔹 CLASS HEALTH (Teacher View)
-@ml_bp.route("/class-health", methods=["GET"])
-@jwt_required()
-def class_health():
-    claims = get_jwt()
-    role = claims.get("role")
-
-    if role != "teacher":
-        return jsonify({"error": "Unauthorized"}), 403
-
-    teacher_id = int(get_jwt_identity())  # 🔥 ADD THIS
-
-    result = get_class_health(teacher_id)  # 🔥 PASS IT
-
-    return jsonify(result)
 @ml_bp.route("/subject-difficulty", methods=["GET"])
 @jwt_required()
 def subject_difficulty():
@@ -141,3 +129,73 @@ def subject_difficulty():
     data = get_subject_difficulty(teacher_id)
 
     return jsonify(data)
+
+@ml_bp.route("/test-class-health/<int:user_id>", methods=["GET"])
+def test_class_health(user_id):
+    result = calculate_class_health(user_id)
+    return jsonify(result)
+
+@ml_bp.route("/class-health", methods=["GET"])
+@jwt_required()
+def class_health():
+    claims = get_jwt()
+    role = claims.get("role")
+
+    if role != "teacher":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    teacher_user_id = int(get_jwt_identity())
+
+    semester = request.args.get("semester")  # 🔥 new
+
+    result = calculate_class_health(teacher_user_id, semester)
+
+    return jsonify(result), 200
+
+@ml_bp.route("/semester-trend", methods=["GET"])
+@jwt_required()
+def semester_trend():
+    claims = get_jwt()
+    role = claims.get("role")
+
+    if role != "teacher":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    teacher_user_id = int(get_jwt_identity())
+    data = get_semester_trend(teacher_user_id)
+
+    return jsonify(data), 200
+
+@ml_bp.route("/interventions", methods=["GET"])
+@jwt_required()
+def intervention_engine():
+    claims = get_jwt()
+    role = claims.get("role")
+
+    if role != "teacher":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    teacher_user_id = int(get_jwt_identity())
+    data = generate_interventions(teacher_user_id)
+
+    return jsonify(data), 200
+
+
+@ml_bp.route("/comparison-insight", methods=["GET"])
+@jwt_required()
+def comparison_insight():
+    claims = get_jwt()
+    role = claims.get("role")
+
+    if role != "teacher":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    teacher_user_id = int(get_jwt_identity())
+
+    data = generate_comparative_insight(teacher_user_id)
+
+    return jsonify(data), 200
+
+@ml_bp.route("/test-comparison/<int:user_id>")
+def test_comparison(user_id):
+    return jsonify(generate_comparative_insight(user_id))
